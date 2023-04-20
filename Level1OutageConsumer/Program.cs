@@ -1,64 +1,43 @@
-﻿using System;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
+﻿using System.Text.Json;
 
-class Program
+namespace Level1OutageConsumer
 {
-    static void Main(string[] args)
+    class Program
     {
-        var factory = new ConnectionFactory()
+        const int VOLT_THRESHOLD = 100;
+        const int MINUTES_THRESHOLD = 2;
+        const int MINUTES_FILTER = (MINUTES_THRESHOLD + 1) * -1;
+
+        static void Main(string[] args)
         {
-            HostName = "localhost",
-            UserName = "admin",
-            Password = "admin"
-        };
-        using (var connection = factory.CreateConnection())
-        using (var channel = connection.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange: "turbine-topic-exchange",
-                                    type: "topic",
-                                    durable: true);
+            var dataHandler = new MongoDBDataHandler("mongodb://localhost:27017", "outages", "outageDocuments");
+            var eventHandler = new RabbitMQEventHandler("localhost", "admin", "admin", "level1-outage");
 
-            // Create a queue for level 1 outages
-            var level1QueueName = "level1-outage";
-            channel.QueueDeclare(queue: level1QueueName,
-                                 durable: true,
-                                 exclusive: false,
-                                 autoDelete: false,
-                                 arguments: null);
-
-            // Bind the level 1 queue to the exchange using the routing key
-            channel.QueueBind(queue: level1QueueName,
-                              exchange: "turbine-topic-exchange",
-                              routingKey: "turbine-topic-exchange.telemetry");
-
-            Console.WriteLine(" [*] Waiting for turbine data.");
-
-            var level1Consumer = new EventingBasicConsumer(channel);
-            level1Consumer.Received += (model, ea) =>
+            eventHandler.StartConsuming(async data =>
             {
-                var body = ea.Body.ToArray();
-                var message = Encoding.UTF8.GetString(body);
-                var data = JsonSerializer.Deserialize<TurbineData>(message);
-                // Console.WriteLine(" [x] Received {0}", message);
+                Console.WriteLine("Received message: {0}", JsonSerializer.Serialize(data));
 
                 // Check if the voltage is below a certain threshold
-                if (data.Volt < 100)
+                if (data.Volt < VOLT_THRESHOLD)
                 {
-                    Console.WriteLine("ALERT: Level 1 power outage detected for turbine {0}", data.TurbineId);
-                }
-            };
-            channel.BasicConsume(queue: level1QueueName,
-                                 autoAck: true,
-                                 consumer: level1Consumer);
+                    // Persist every outage
+                    var turbineId = data.TurbineId;
+                    await dataHandler.InsertAsync(data);
 
-            while (true)
-            {
-                Thread.Sleep(1000);
-            }
+                    //Verify if it is a recurrent outage
+                    var lastReadings = await dataHandler.GetListWithinTimeFrameByTurbineIdAsync(turbineId, DateTime.UtcNow.AddMinutes(MINUTES_FILTER));
+                    var isEveryThingAnOutage = !lastReadings.Any(e => e.Volt >= VOLT_THRESHOLD);
+
+                    if (isEveryThingAnOutage)
+                    {
+                        var outageWithinTimeFrame = lastReadings.Any(doc => Math.Abs((data.TimeStamp - doc.TimeStamp).TotalMinutes) >= MINUTES_THRESHOLD);
+                        if (outageWithinTimeFrame)
+                        {
+                            Console.WriteLine("ALERT: Level 1 power outage detected for turbine {0}", data.TurbineId);
+                        }
+                    }
+                }
+            });
         }
     }
 }

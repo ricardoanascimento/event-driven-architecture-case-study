@@ -4,5 +4,5 @@ public class TurbineData
     public float Volt { get; set; }
     public float Amp { get; set; }
     public int RPM { get; set; }
-    public DateTime Timestamp { get; set; }
+    public DateTime TimeStamp { get; set; }
 }

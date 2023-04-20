@@ -24,10 +24,8 @@ class Program
             var turbineIds = new List<string>
             {
                 Guid.NewGuid().ToString(),
-                Guid.NewGuid().ToString(),
-                Guid.NewGuid().ToString(),
-                Guid.NewGuid().ToString(),
-                Guid.NewGuid().ToString()
+                // Guid.NewGuid().ToString(),
+                // Guid.NewGuid().ToString(),
             };
 
             // Simulate turbine data and publish it to RabbitMQ
@@ -37,14 +35,15 @@ class Program
                 var data = new TurbineData
                 {
                     TurbineId = turbineIds[random.Next(turbineIds.Count)],
-                    Volt = (float)random.NextDouble() * 1000,
+                    // Volt = (float)random.NextDouble() * 1000,
+                    Volt = 90,
                     Amp = (float)random.NextDouble() * 100,
                     RPM = random.Next(1000, 2000),
-                    Timestamp = DateTime.UtcNow
+                    TimeStamp = DateTime.UtcNow
                 };
                 var messageBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data));
-                channel.BasicPublish(exchange: "turbine-topic-exchange",
-                                      routingKey: "turbine-topic-exchange.telemetry",
+                channel.BasicPublish(exchange: "turbine-exchange",
+                                      routingKey: "turbine-exchange.telemetry",
                                       basicProperties: null,
                                       body: messageBody);
                 Console.WriteLine("Sent message: {0}", JsonSerializer.Serialize(data));
