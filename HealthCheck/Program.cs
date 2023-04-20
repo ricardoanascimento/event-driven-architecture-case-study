@@ -4,9 +4,9 @@ namespace Level1OutageConsumer
 {
     class Program
     {
-        const int VOLT_THRESHOLD = 100;
-        const int MINUTES_THRESHOLD = 2;
-        const int MINUTES_FILTER = (MINUTES_THRESHOLD + 1) * -1;
+        static int voltThreshold = int.TryParse(Environment.GetEnvironmentVariable("VOLT_THRESHOLD"), out int result) ? result : 100;
+        static int minutesThreshold = int.TryParse(Environment.GetEnvironmentVariable("MINUTES_THRESHOLD"), out int result) ? result : 2;
+        static int minutesFilter = (minutesThreshold + 1) * -1;
 
         static void Main(string[] args)
         {
@@ -18,19 +18,19 @@ namespace Level1OutageConsumer
                 Console.WriteLine("Received message: {0}", JsonSerializer.Serialize(data));
 
                 // Check if the voltage is below a certain threshold
-                if (data.Volt < VOLT_THRESHOLD)
+                if (data.Volt < voltThreshold)
                 {
                     // Persist every outage
                     var turbineId = data.TurbineId;
                     await dataHandler.InsertAsync(data);
 
                     //Verify if it is a recurrent outage
-                    var lastReadings = await dataHandler.GetListWithinTimeFrameByTurbineIdAsync(turbineId, DateTime.UtcNow.AddMinutes(MINUTES_FILTER));
-                    var isEveryThingAnOutage = !lastReadings.Any(e => e.Volt >= VOLT_THRESHOLD);
+                    var lastReadings = await dataHandler.GetListWithinTimeFrameByTurbineIdAsync(turbineId, DateTime.UtcNow.AddMinutes(minutesFilter));
+                    var isEveryThingAnOutage = !lastReadings.Any(e => e.Volt >= voltThreshold);
 
                     if (isEveryThingAnOutage)
                     {
-                        var outageWithinTimeFrame = lastReadings.Any(doc => Math.Abs((data.TimeStamp - doc.TimeStamp).TotalMinutes) >= MINUTES_THRESHOLD);
+                        var outageWithinTimeFrame = lastReadings.Any(doc => Math.Abs((data.TimeStamp - doc.TimeStamp).TotalMinutes) >= minutesThreshold);
                         if (outageWithinTimeFrame)
                         {
                             Console.WriteLine("ALERT: Level 1 power outage detected for turbine {0}", data.TurbineId);
