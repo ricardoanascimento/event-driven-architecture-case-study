@@ -8,14 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
-    <PackageReference Include="RabbitMQ.Client" Version="6.5.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="SharedKernel">
       <HintPath>lib\SharedKernel.dll</HintPath>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
+    <PackageReference Include="RabbitMQ.Client" Version="6.5.0" />
   </ItemGroup>
 
 </Project>
